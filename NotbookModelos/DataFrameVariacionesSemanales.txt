@@ -1,0 +1,45 @@
+SELECT DFF.semana, DFF.empresa, DFF.marca, DFF.subsegmento, DFF.modeloP, SUM(DFF.cantidades) as cantidades,
+MAX(DFF.precio) AS MAX_PRECIO_SEM,
+MIN(DFF.precio) AS MIN_PRECIO_SEM,
+ROUND(AVG (DFF.precio),0) AS PROM_PRECIO_SEM
+FROM (
+SELECT  
+DF.fecha, 
+DF.empresa,DF.marca,DF.subsegmento,DF.modeloP, DF.precio, 
+date_trunc('week', DF.fecha) + interval '7' day as semana,
+SUM(DF.cantidades) as cantidades FROM (
+
+SELECT 
+PR.fecha ,
+CASE WHEN LENGTH(RU.empresa)>1  THEN RU.empresa
+    ELSE ULTIMOR.Ult_empresa
+    END AS empresa,
+CASE WHEN RU.marca IS NULL THEN ULTIMOR.Ult_marca
+    ELSE RU.marca
+    END AS marca,
+SEG.subsegmento,
+PR.modelo AS modeloP,
+CASE WHEN SUM(RU.cantidad)>0 THEN SUM(RU.cantidad)
+ELSE 0
+END AS cantidades,
+PR.precio
+FROM runt2022.precios PR
+	LEFT JOIN runt2022.segmentos SEG on SEG.modelo = PR.modelo
+	LEFT JOIN runt2022.runt RU ON RU.modelo = PR.modelo and PR.fecha = cast(DATE_PARSE(RU.fecha,'%d/%m/%Y') as date)
+	LEFT JOIN (SELECT * FROM(
+        SELECT RU.modelo AS modelo,
+        RU.fecha AS MaxfechaR,
+        RU.empresa as Ult_empresa,
+        RU.marca as Ult_marca,
+        ROW_NUMBER() OVER (PARTITION BY RU.modelo ORDER BY RU.fecha DESC) ROWN
+        FROM runt2022.runt RU) MAX
+        WHERE MAX.ROWN=1) ULTIMOR ON ULTIMOR.modelo = PR.modelo
+
+WHERE 1=1 
+AND year(PR.fecha) in (2021,2022)
+AND PR.fecha < date('2022-11-01')
+AND SEG.subsegmento = 'COMMUTER ENTRY' 
+group by  RU.empresa, RU.marca, subsegmento, precio,PR.fecha, PR.modelo, ULTIMOR.Ult_empresa, ULTIMOR.Ult_marca ) DF
+GROUP BY DF.fecha, DF.empresa,DF.marca,DF.subsegmento,DF.modeloP, DF.precio) DFF
+group by semana, empresa, marca, subsegmento, modeloP
+ORDER BY 5,1 ASC

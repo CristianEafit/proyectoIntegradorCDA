@@ -1,0 +1,10 @@
+SELECT RU.modelo,
+MAX(cast(DATE_PARSE(RU.fecha,'%d/%m/%Y') as date)) AS MaxfechaQ,
+MIN(cast(DATE_PARSE(RU.fecha,'%d/%m/%Y') as date)) AS MinfechaQ,
+MAX(PR.fecha) AS MaxfechaP,
+MIN(PR.fecha) AS MaxfechaP
+FROM runt2022.runt RU
+LEFT JOIN runt2022.precios PR ON PR.modelo = RU.modelo
+LEFT JOIN runt2022.segmentos SEG on SEG.modelo = RU.modelo
+WHERE SEG.subsegmento ='COMMUTER ENTRY'
+GROUP BY RU.modelo

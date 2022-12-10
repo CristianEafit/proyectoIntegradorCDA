@@ -1,0 +1,63 @@
+---DATAFRAME DESDE EL RUNT SIN VARIACIONES
+
+SELECT DFF.semana, DFF.empresa, DFF.marca, DFF.subsegmento, DFF.modelo, SUM(DFF.cantidades) as cantidades,
+MAX(DFF.precioM) AS MAX_PRECIO_SEM,
+MIN(DFF.precioM) AS MIN_PRECIO_SEM,
+ROUND(AVG (DFF.precioM),0) AS PROM_PRECIO_SEM
+FROM (
+
+SELECT  
+DF.fechaM, 
+DF.empresa,DF.marca,DF.subsegmento,DF.modelo, DF.precioM, 
+date_trunc('week', DF.fechaM) + interval '7' day as semana,
+SUM(DF.cantidad) as cantidades
+--ROW_NUMBER() OVER (PARTITION BY DF.modelo ORDER BY DF.fechaM ASC) consecutivo
+FROM (
+SELECT 
+--ROW_NUMBER() OVER (PARTITION BY RU.modelo ORDER BY cast(DATE_PARSE(RU.fecha,'%d/%m/%Y') as date) ASC) ROWN2,
+cast(DATE_PARSE(RU.fecha,'%d/%m/%Y') as date) AS fechaM,
+RU.empresa,
+RU.marca,
+SEG.subsegmento,
+RU.modelo,
+RU.cantidad,
+--PR.precio,
+case 
+    WHEN PR.precio >10000 then PR.precio
+    ELSE ( CASE WHEN cast(DATE_PARSE(RU.fecha,'%d/%m/%Y') as date) < date(PRIMERP.MinfechaP) THEN PRIMERP.primer_precio
+            ELSE ULTIMOP.Ult_precio END)
+    END as precioM
+--,ULTIMOP.Ult_precio
+--,PRIMERP.primer_precio
+FROM runt2022.runt RU
+	LEFT JOIN runt2022.segmentos SEG on SEG.modelo = RU.modelo
+	LEFT JOIN runt2022.precios PR ON PR.modelo = RU.modelo and PR.fecha = cast(DATE_PARSE(RU.fecha,'%d/%m/%Y') as date)
+	
+	LEFT JOIN (SELECT * FROM(
+        SELECT PR.modelo AS modelo,
+        PR.fecha AS MaxfechaP,
+        PR.precio as Ult_precio,
+        ROW_NUMBER() OVER (PARTITION BY PR.modelo ORDER BY PR.fecha DESC) ROWN
+        FROM runt2022.precios PR) MAX
+        WHERE MAX.ROWN=1) ULTIMOP ON ULTIMOP.modelo = RU.modelo
+        
+	LEFT JOIN (SELECT * FROM(
+        SELECT PR.modelo AS modelo,
+        PR.fecha AS MinfechaP,
+        PR.precio as primer_precio,
+        ROW_NUMBER() OVER (PARTITION BY PR.modelo ORDER BY PR.fecha ASC) ROWN
+        FROM runt2022.precios PR) MIN
+        WHERE MIN.ROWN=1) PRIMERP ON PRIMERP.modelo = RU.modelo        
+	
+WHERE 1=1
+--and SEG.subsegmento = 'COMMUTER ENTRY' ---and RU.marca='TVS'
+ORDER BY fechaM,  RU.modelo ASC) DF
+WHERE 1=1 
+AND DF.precioM>10000
+AND year(DF.fechaM) in (2021,2022)
+AND DF.fechaM < date('2022-11-01')
+AND DF.subsegmento = 'COMMUTER ENTRY' 
+group by fechaM, empresa, marca, subsegmento, modelo, precioM) DFF
+
+group by semana, empresa, marca, subsegmento, modelo
+ORDER BY 5,1 ASC
